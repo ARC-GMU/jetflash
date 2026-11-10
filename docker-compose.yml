@@ -1,0 +1,35 @@
+services:
+  jetflash:
+    build: .
+    image: jetflash:22.04
+    container_name: jetflash
+    # Flashing needs raw USB access, loop devices, mounts, binfmt (qemu for the
+    # arm64 rootfs) and an NFS server for the USB-network initrd flash.
+    privileged: true
+    # The Jetson shows up as a USB network device (usb0 / l4tbr0) during
+    # initrd flashing; the container must see the host's interfaces.
+    network_mode: host
+    stdin_open: true
+    tty: true
+    environment:
+      # Override at run time: L4T_VERSION=36.5.2 docker compose run ...
+      - L4T_VERSION=${L4T_VERSION:-36.5.2}
+      - JETSON_USER=${JETSON_USER:-}
+      - JETSON_PASS=${JETSON_PASS:-}
+      - JETSON_HOST=${JETSON_HOST:-jetson}
+      - LOOP=${LOOP:-0}
+      - FRESH=${FRESH:-0}
+    volumes:
+      # Full /dev (not only /dev/bus/usb): the Jetson re-enumerates several
+      # times during a flash (APX recovery -> initrd USB gadget), creating new
+      # /dev/bus/usb/* nodes and /dev/sdX mass-storage nodes on the fly.
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
+      - /lib/modules:/lib/modules:ro
+      - /sys:/sys
+      # BSP, rootfs and downloads live here so they persist between runs.
+      - ./workspace:/workspace
+    device_cgroup_rules:
+      - "c 189:* rmw"   # USB devices
+      - "b 8:* rmw"     # SCSI/USB mass storage
+      - "b 7:* rmw"     # loop devices
